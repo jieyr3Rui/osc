@@ -1,13 +1,14 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <semaphore.h>
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
-
+#include <stdlib.h>
 sem_t *sem_p = NULL, *sem_c = NULL;
 
 typedef struct _data{
@@ -20,19 +21,12 @@ pthread_t g_thread[COUNT_PROD];
 pthread_mutex_t g_mutex;
 
 void* producer(void* arg){
+    int id = (int)arg;
     while(1){
        sem_wait(sem_p);
        pthread_mutex_lock(&g_mutex);
-       printf("prod[%d]", (int)arg);
-       int val = 0;
-       sem_getvalue(sem_p, &val);
-       printf(" sem_p = %d\n", val);
-       p->num[p->index++] = (int)arg;
-       for(int ii = 0; ii < 20; ii++){
-          printf("%d ", p->num[ii]);
-       }
-       printf("\n");
-       pthread_cond_signal(&g_cont);
+       p->num[p->index++] = rand()%10;
+       printf("prod[%d] set %5d\n", id, p->num[p->index - 1]);
        pthread_mutex_unlock(&g_mutex);
        sleep(5);
        sem_post(sem_c);  

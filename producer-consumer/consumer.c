@@ -20,19 +20,22 @@ pthread_t g_thread[COUNT_CONS];
 pthread_mutex_t g_mutex;
 
 void* consumer(void* arg){
+    int id = (int)arg;
     while(1){
         sem_wait(sem_c);
         pthread_mutex_lock(&g_mutex);
         
-        printf("cons[%d]", (int)arg);
+        //printf("cons[%d]", id);
         int val = 0;
         sem_getvalue(sem_c, &val);
         printf(" sem_c = %d\n", val);
+        printf("cons[%d] get %5d\n",id,p->num[p->index-1]);
         p->num[--p->index] = 0;
-        for(int ii = 0; ii < 20; ii++){
-            printf("%d ", p->num[ii]);
-        }
-        printf("\n");
+        //printf("index = %d\n", p->index);
+        //for(int ii = 0; ii < 20; ii++){
+        //    printf("%d ", p->num[ii]);
+        //}
+        //printf("\n");
         pthread_mutex_unlock(&g_mutex);
         sleep(1);
         sem_post(sem_p);
