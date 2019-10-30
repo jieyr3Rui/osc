@@ -17,10 +17,13 @@ typedef struct _data{
 data *p = NULL;
 #define COUNT_CONS 3
 pthread_t g_thread[COUNT_CONS];
+pthread_mutex_t g_mutex;
 
 void* consumer(void* arg){
     while(1){
         sem_wait(sem_c);
+        pthread_mutex_lock(&g_mutex);
+        
         printf("cons[%d]", (int)arg);
         int val = 0;
         sem_getvalue(sem_c, &val);
@@ -30,12 +33,15 @@ void* consumer(void* arg){
             printf("%d ", p->num[ii]);
         }
         printf("\n");
+        pthread_mutex_unlock(&g_mutex);
         sleep(1);
         sem_post(sem_p);
     }
 }
 
 int main(){
+    pthread_mutex_init(&g_mutex, NULL);
+
     int shmid = -1;
     key_t key = 0x2235;
 
