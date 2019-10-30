@@ -1,7 +1,9 @@
+#include <math.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/syscall.h>
 #include <semaphore.h>
 #include <stdio.h>
 #include <errno.h>
@@ -9,7 +11,12 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <stdlib.h>
+
 sem_t *sem_p = NULL, *sem_c = NULL;
+typedef struct _args{
+    int id;
+    int lambda;
+}args;
 
 typedef struct _data{
     int index;
@@ -20,21 +27,52 @@ data *p = NULL;
 pthread_t g_thread[COUNT_PROD];
 pthread_mutex_t g_mutex;
 
-void* producer(void* arg){
-    int id = (int)arg;
+// Possion Function
+int possion(int lambda){
+
+    int k = 0;
+    long double p = 1.0;
+    long double l = exp(-(double)lambda);
+    while(p>=l){
+        double f;
+        //srand((unsigned)time(NULL));
+        f = (double)(rand() % 100);
+        f = f / 100.0;
+        p *= f;
+        k++;
+    }
+    return k-1;
+}
+
+void* producer(void* param){
+    args* arg = (args*)param;
+    int id = arg->id, lambda = arg->lambda;
     while(1){
        sem_wait(sem_p);
        pthread_mutex_lock(&g_mutex);
+       srand((unsigned)time(NULL)+10*id);
        p->num[p->index++] = rand()%10;
-       printf("prod[%d] set %5d\n", id, p->num[p->index - 1]);
+       printf("pid:%7d tid:%7ld ", getpid(), syscall(__NR_gettid));
+       printf("prod set %5d ", p->num[p->index - 1]);
        pthread_mutex_unlock(&g_mutex);
-       sleep(5);
+       // limit poss  
+       int poss = possion(lambda) % 10 + 1;
+       printf("sleep %ds\n", poss);
+       sleep(poss);
        sem_post(sem_c);  
     }
 }
 
 
-int main(){
+int main(int argc, char **argv){
+    if(argc < 2){
+        printf("please input lambda!\n");
+        return 0;
+    }
+    else if(argc > 2){
+        printf("please input a number for lambda!\n");
+        return 0;
+    }
     pthread_mutex_init(&g_mutex, NULL);
 
     int shmid = -1;
@@ -74,10 +112,14 @@ int main(){
     }  
  
     for(int ii = 0; ii < COUNT_PROD; ii++){
-        pthread_create(&g_thread[ii], NULL, producer, (void*)ii);
+        args* arg = (args*)malloc(sizeof(args));
+        arg->id = ii;
+        arg->lambda = atoi(argv[1]);
+        pthread_create(&g_thread[ii], NULL, producer, (void*)arg);
     } 
     for(int ii = 0; ii < COUNT_PROD; ii++){
         pthread_join(g_thread[ii], NULL);
     }
     return 0;
 }
+
