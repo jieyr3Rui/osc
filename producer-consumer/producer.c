@@ -18,9 +18,10 @@ typedef struct _args{
     int lambda;
 }args;
 
+sem_t *sem_mutex, *sem_p, *sem_c;
+
 /* data structure in shm*/
 typedef struct _data{
-    sem_t *sem_mutex, *sem_p, *sem_c;
     int index;
     int num[20];
 }data;
@@ -50,8 +51,8 @@ void* producer(void* param){
     args* arg = (args*)param;
     int id = arg->id, lambda = arg->lambda;
     while(1){
-        sem_wait(p->sem_mutex);
-        sem_wait(p->sem_p);
+        sem_wait(sem_mutex);
+        sem_wait(sem_p);
    
         srand((unsigned)time(NULL)+10*id);
         /* produce a number 0~9 */
@@ -59,8 +60,8 @@ void* producer(void* param){
         printf("pid:%7d tid:%7ld ", getpid(), syscall(__NR_gettid));
         printf("prod set %5d ", p->num[p->index - 1]);
 
-        sem_post(p->sem_c); 
-        sem_post(p->sem_mutex);
+        sem_post(sem_c); 
+        sem_post(sem_mutex);
 
         /* define and limit */
         int poss = possion(lambda) % 10 + 1;
@@ -98,27 +99,27 @@ int main(int argc, char **argv){
         return -1;
     }
 
-    /* init p->sem_mutex */
-    p->sem_mutex = sem_open("sem_mutex", O_CREAT | O_RDWR, 0666, 20);
-    if(p->sem_mutex == SEM_FAILED){
+    /* init sem_mutex */
+    sem_mutex = sem_open("sem_mutex", O_CREAT | O_RDWR, 0666, 1);
+    if(sem_mutex == SEM_FAILED){
         printf("errno = %d\n", errno);
         return -1;
     }
-    sem_init(p->sem_mutex, 1, 1);
-    /* init p->sem_p */
-    p->sem_p = sem_open("sem_p", O_CREAT | O_RDWR, 0666, 20);
-    if(p->sem_p == SEM_FAILED){
+    sem_init(sem_mutex, 1, 1);
+    /* init sem_p */
+    sem_p = sem_open("sem_p", O_CREAT | O_RDWR, 0666, 20);
+    if(sem_p == SEM_FAILED){
         printf("errno = %d\n", errno);
         return -1;
     }
-    sem_init(p->sem_p, 1, 20);
-    /* init p->sem_c*/
-    p->sem_c = sem_open("sem_c", O_CREAT | O_RDWR, 0666, 0);
-    if(p->sem_c == SEM_FAILED){
+    sem_init(sem_p, 1, 20);
+    /* init sem_c*/
+    sem_c = sem_open("sem_c", O_CREAT | O_RDWR, 0666, 0);
+    if(sem_c == SEM_FAILED){
         printf("errno = %d\n", errno);
         return -1;
     }
-    sem_init(p->sem_c, 1, 0);
+    sem_init(sem_c, 1, 0);
     /* init p->index and p->data*/
     p->index = 0;
     for(int ii = 0; ii < 20; ii++){
