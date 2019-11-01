@@ -29,8 +29,8 @@ typedef struct _data{
 /* pointer to shm */
 data *p = NULL;
 
-#define COUNT_PROD 3
-pthread_t g_thread[COUNT_PROD];
+#define COUNT_CONS 3
+pthread_t g_thread[COUNT_CONS];
 
 /* Possion Function */
 int possion(int lambda){
@@ -47,30 +47,28 @@ int possion(int lambda){
     return k-1;
 }
 
-void* producer(void* param){
+
+void* consumer(void* param){
     args* arg = (args*)param;
     int id = arg->id, lambda = arg->lambda;
     while(1){
         sem_wait(sem_mutex);
-        sem_wait(sem_p);
-   
-        srand((unsigned)time(NULL)+10*id);
-        /* produce a number 0~9 */
-        p->num[p->index++] = rand()%9 + 1;
-        printf("pid:%7d tid:%7ld ", getpid(), syscall(__NR_gettid));
-        printf("prod set %5d ", p->num[p->index - 1]);
+        sem_wait(sem_c);
 
-        sem_post(sem_c); 
+        printf("pid:%7d tid:%7ld ", getpid(), syscall(__NR_gettid));
+        printf("cons get %2d ",p->num[p->index-1]);
+        /* consume a number to 0 */
+        p->num[--p->index] = 0;
+
+        sem_post(sem_p);
         sem_post(sem_mutex);
 
         /* define and limit */
         int poss = possion(lambda) % 10 + 1;
         printf("sleep %ds\n", poss);
         sleep(poss);
-         
     }
 }
-
 
 int main(int argc, char **argv){
     /* check argment input*/
@@ -86,7 +84,7 @@ int main(int argc, char **argv){
     /* config shm and mat p */
     int shmid = -1;
     key_t key = 0x2235;
-    shmid = shmget(key, sizeof(data), 0666 | IPC_CREAT);
+    shmid = shmget(key,0, 0);
     if(shmid == -1){
         printf("shmget failed\n");
         perror("shmget err");
@@ -100,40 +98,33 @@ int main(int argc, char **argv){
     }
 
     /* init sem_mutex */
-    sem_mutex = sem_open("sem_mutex", O_CREAT | O_RDWR, 0666, 1);
+    sem_mutex = sem_open("sem_mutex", 0);
     if(sem_mutex == SEM_FAILED){
         printf("errno = %d\n", errno);
         return -1;
     }
-    sem_init(sem_mutex, 1, 1);
     /* init sem_p */
-    sem_p = sem_open("sem_p", O_CREAT | O_RDWR, 0666, 20);
+    sem_p = sem_open("sem_p", 0);
     if(sem_p == SEM_FAILED){
         printf("errno = %d\n", errno);
         return -1;
     }
-    sem_init(sem_p, 1, 20);
     /* init sem_c*/
-    sem_c = sem_open("sem_c", O_CREAT | O_RDWR, 0666, 0);
+    sem_c = sem_open("sem_c", 0);
     if(sem_c == SEM_FAILED){
         printf("errno = %d\n", errno);
         return -1;
     }
-    sem_init(sem_c, 1, 0);
-    /* init p->index and p->data*/
-    p->index = 0;
-    for(int ii = 0; ii < 20; ii++){
-        p->num[ii] = 0;
-    }  
 
-    /* create threads*/
-    for(int ii = 0; ii < COUNT_PROD; ii++){
-        args* arg = (args*)malloc(sizeof(args));
-        arg->id = ii;
-        arg->lambda = atoi(argv[1]);
-        pthread_create(&g_thread[ii], NULL, producer, (void*)arg);
-    } 
-    for(int ii = 0; ii < COUNT_PROD; ii++){
+
+    /* create threads */
+    for(int ii = 0; ii < COUNT_CONS; ii++){
+       args *arg = (args*)malloc(sizeof(args));
+       arg->id = ii;
+       arg->lambda = atoi(argv[1]);
+       pthread_create(&g_thread[ii], NULL, consumer, (void*)arg);
+    }
+    for(int ii = 0; ii < COUNT_CONS; ii++){
         pthread_join(g_thread[ii], NULL);
     }
     return 0;
